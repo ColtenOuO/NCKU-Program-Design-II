@@ -54,8 +54,23 @@
 
 using namespace std;
 
-vector<pair<str_token,int>> data2;
-unordered_map<string,int32_t> init_mp;
+unordered_map<string,unordered_set<int>> data2;
+unordered_map<string,set<int32_t>> init_mp;
+
+struct custom_hash {
+    static uint64_t splitmix64(uint64_t x) {
+        // http://xorshift.di.unimi.it/splitmix64.c
+        x += 0x9e3779b97f4a7c15;
+        x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9;
+        x = (x ^ (x >> 27)) * 0x94d049bb133111eb;
+        return x ^ (x >> 31);
+    }
+ 
+    size_t operator()(uint64_t x) const {
+        static const uint64_t FIXED_RANDOM = chrono::steady_clock::now().time_since_epoch().count();
+        return splitmix64(x + FIXED_RANDOM);
+    }
+};
 
 bool cmp(pair<double,int> &a,pair<double,int> &b)
 {
@@ -72,20 +87,17 @@ signed main(int argc,char* argv[])
     string s;
     char u;
     int idx,cnt = 0;
+    str_token new_data(init_mp);
     while( corpus >> idx >> u >> u ) // read 'id',',','"'
     {
         getline(corpus,s);
-
-        str_token new_data(init_mp);
-
-        string_token_parsing(s,new_data);
-        data2.push_back(make_pair(new_data,idx));
+        string_token_parsing(s,new_data,idx);
         cnt++;
     }
 
     //cin.clear();
    // freopen(argv[2],"r",stdin);
-     map<int,double> answer;
+    unordered_map<int,double,custom_hash> answer;
     string input;
     while( getline(query,input) )
     {
@@ -104,33 +116,29 @@ signed main(int argc,char* argv[])
 
             int total = 0;
 
-            for( auto i : data2 )
-            {
-                if( i.first.mp[query] != 0 ) total++;
-            }
+            int sz = new_data.mp[query].size();
 
-       //     cout << query << " " << total << "\n";
-
-            for( auto i : data2 )
+            for( auto i : new_data.mp[query] )
             {
-                if( i.first.mp[query] != 0 ) answer[i.second] += log10((double)cnt / (double)total);
+                answer[i] += log10((double)cnt / sz );
             }
         }
 
         vector<pair<double,int>> v;
-        for( auto i : answer ) v.push_back(make_pair(i.second,i.first)) , answer[i.first] = 0;
+        for( auto i : answer ) v.push_back(make_pair(i.second,i.first)) , answer[i.first] = 0.0;
         sort(v.begin(),v.end(),cmp);
 
-     //   for(int i=0;i<2;i++) cout << v[i].second << " " << v[i].first << "\n";
+      //  for(int i=0;i<2;i++) cout << v[i].second << " " << v[i].first << "\n";
 
         int k = stoi(argv[3]);
         for(int i=0;i<k;i++)
         {
-            if( v[i].first == 0 ) cout << -1;
+            if( i >= v.size() ) cout << -1;
+            else if( v[i].first <= 0 ) cout << -1;
             else
             {
                 int ouo = v[i].second;  
-                cout << ouo;                
+                cout << v[i].second;                
             }
 
             if( i != k - 1 ) cout << " ";
